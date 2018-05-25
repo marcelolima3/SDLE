@@ -2,8 +2,8 @@ import logging
 import asyncio
 import sys
 
-from kademlia.network import Server
 from LocalStorage import local_storage
+from DHT import node 
 
 queue = asyncio.Queue()
 nickname = ""
@@ -30,37 +30,13 @@ def task(server, loop, nickname):
         # TODO supposed to be a json file with the user info
         # build a menu with options like "tweet", "follow user", "leave"
 
-# starting a node
-def start_node(Port, BTIp="", BTPort=0): 
-    handler = logging.StreamHandler()
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    handler.setFormatter(formatter)
-    
-    # DEBUG
-    log = logging.getLogger('kademlia')
-    log.addHandler(handler)
-    log.setLevel(logging.DEBUG)
-
-    server = Server()
-    server.listen(Port)
-
-    loop = asyncio.get_event_loop()
-    loop.set_debug(True)
-
-    # the first peer don't do that
-    if not BTPort == 0:    
-        bootstrap_node = (BTIp, int(BTPort))
-        loop.run_until_complete(server.bootstrap([bootstrap_node]))
-
-    return (server, loop)
-
 
 # start peer or not as Bootstrap
 def start():
     if len(sys.argv) > 2:
-        return start_node(int(sys.argv[1]), sys.argv[2], int(sys.argv[3]))
+        return node.start_node(int(sys.argv[1]), sys.argv[2], int(sys.argv[3]))
     else: 
-        return start_node(int(sys.argv[1]))
+        return node.start_node(int(sys.argv[1]))
 
 # get the nickname
 def get_nickname():
@@ -79,6 +55,7 @@ def check_argv():
 def show():
     for m in messages:
         print(m['id'] + ' - ' + m['message'])
+
 
 """ MAIN """
 if __name__ == "__main__":
