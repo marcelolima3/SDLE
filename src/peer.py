@@ -24,7 +24,7 @@ def task(server, loop, nickname):
         msg = yield from queue.get()
         messages.append({
             'id' : nickname,
-            'message': msg
+            'message': msg.replace('\n', '')
         })
         asyncio.ensure_future(server.set(nickname, msg)) 
         # TODO supposed to be a json file with the user info
@@ -65,7 +65,7 @@ def start():
 # get the nickname
 def get_nickname():
     print('Nickname: ')
-    return sys.stdin.readline()
+    return sys.stdin.readline().replace('\n', '')
 
 
 # check if the number of args is valid
