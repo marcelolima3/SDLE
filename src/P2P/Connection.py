@@ -52,16 +52,9 @@ class Connection:
     def send(self, msg):
         try:
             self.sock.sendall(msg.encode('utf-8'))
-
-            # Look for the response
-            amount_received = 0
-            amount_expected = 3
-            
-            while amount_received < amount_expected:
-                data = self.sock.recv(128)
-                amount_received += len(data)
-                print ('received "%s"' % data.decode('utf-8'))
-
+           
+            data = self.sock.recv(16)
+            print ('received "%s"' % data.decode('utf-8'))
         finally:
             print('closing socket')
             self.sock.close()
