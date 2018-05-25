@@ -26,8 +26,9 @@ def task(server, loop, nickname):
             'id' : nickname,
             'message': msg
         })
-        asyncio.ensure_future(server.set(nickname, msg)) # TODO supposed to be a json file with the user info
-
+        asyncio.ensure_future(server.set(nickname, msg)) 
+        # TODO supposed to be a json file with the user info
+        # build a menu with options like "tweet", "follow user", "leave"
 
 # starting a node
 def start_node(Port, BTIp="", BTPort=0): 
