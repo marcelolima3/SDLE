@@ -4,6 +4,7 @@ import sys
 
 from LocalStorage import local_storage
 from DHT import node 
+from P2P import Connection
 
 queue = asyncio.Queue()
 nickname = ""
