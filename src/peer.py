@@ -12,6 +12,7 @@ messages = []
 following = []
 db_file = 'db'
 
+
 # handler process IO request
 def handle_stdin():
     data = sys.stdin.readline()
@@ -39,6 +40,7 @@ def start():
     else: 
         return node.start_node(int(sys.argv[1]))
 
+
 # get the nickname
 def get_nickname():
     print('Nickname: ')
@@ -56,6 +58,31 @@ def check_argv():
 def show():
     for m in messages:
         print(m['id'] + ' - ' + m['message'])
+
+
+# get timeline to the followings TODO
+def get_timeline():
+    print('TODO')
+
+
+# merge all timelines TODO
+def merge_timelines():
+    print('TODO')
+
+
+# check a set of vector clocks TODO
+def check_vector_clocks():
+    print('TODO')
+
+
+# build a json with user info TODO
+def build_user_info():
+    print('TODO')
+
+
+# follow a user. After, he can be found in the list "followings" TODO
+def follow_user():
+    print('TODO')
 
 
 """ MAIN """
