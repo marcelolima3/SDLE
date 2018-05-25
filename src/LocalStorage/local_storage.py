@@ -10,6 +10,7 @@ messages = [
 # Following example
 following = [{'id': 'antonio', 'ip': '192.168.1.69'}]
 
+
 # Convert data to JSON
 def dataToJson(messages, following):
     data = {}
@@ -17,22 +18,32 @@ def dataToJson(messages, following):
     data['following'] = following
     return json.dumps(data)
 
+
 # Convert JSON to data
 def JsonToData(string):
     data = json.loads(string)
     return (data['messages'], data['following'])   
 
+
 # Import data from file 
 def importData(filename):
-    with open(f'{filename}.json') as data_file:    
-        return json.load(data_file)
+    try:
+        with open(f'{filename}.json') as data_file:    
+            data = json.load(data_file)
+            data_file.close()
+            return data
+    except Exception:
+        pass
+       
 
 # Export data to file  
 def exportData(data, filename):
     with open(f'{filename}.json', 'w') as outfile:
         json.dump(data, outfile, sort_keys=True, indent=4)
+    outfile.close()
 
 
+"""
 if __name__== "__main__":
     parser = argparse.ArgumentParser(prog='local_storage')
     parser.add_argument('-u','--username', help = 'Your username', required = True)
@@ -50,3 +61,4 @@ if __name__== "__main__":
 
     for i in result_following:
         print(i)
+"""
