@@ -12,7 +12,7 @@ following = [{'id': 'antonio', 'ip': '192.168.1.69'}]
 
 
 # Convert data to JSON
-def dataToJson(messages, following):
+def __dataToJson(messages, following):
     data = {}
     data['messages'] = messages
     data['following'] = following
@@ -20,13 +20,13 @@ def dataToJson(messages, following):
 
 
 # Convert JSON to data
-def JsonToData(string):
+def __JsonToData(string):
     data = json.loads(string)
     return (data['messages'], data['following'])   
 
 
 # Import data from file 
-def importData(filename):
+def __importData(filename):
     try:
         with open(f'{filename}.json') as data_file:    
             data = json.load(data_file)
@@ -37,28 +37,22 @@ def importData(filename):
        
 
 # Export data to file  
-def exportData(data, filename):
+def __exportData(data, filename):
     with open(f'{filename}.json', 'w') as outfile:
         json.dump(data, outfile, sort_keys=True, indent=4)
     outfile.close()
 
 
-"""
-if __name__== "__main__":
-    parser = argparse.ArgumentParser(prog='local_storage')
-    parser.add_argument('-u','--username', help = 'Your username', required = True)
+# load all data from file
+def read_data(db_file):
+    data = __importData(db_file)
+    if data:
+        return __JsonToData(data)
+    
+    return ([], [])
 
-    args = parser.parse_args()
 
-    json_data = dataToJson(messages, following)
-    exportData(json_data, args.username)
-
-    data = importData(args.username)
-    result_msg, result_following = JsonToData(data)
-
-    for i in result_msg:
-        print(i)
-
-    for i in result_following:
-        print(i)
-"""
+# save all data to the file
+def save_data(messages, following, db_file):
+    data = __dataToJson(messages, following)
+    __exportData(data, db_file)

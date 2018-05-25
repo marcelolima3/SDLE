@@ -75,21 +75,6 @@ def check_argv():
         sys.exit(1)
 
 
-# load all data from file
-def read_data():
-    data = local_storage.importData(db_file+nickname)
-    if data:
-        return local_storage.JsonToData(data)
-    
-    return ([], [])
-
-
-# save all data to the file
-def save_data():
-    data = local_storage.dataToJson(messages, following)
-    local_storage.exportData(data, db_file+nickname)
-
-
 # print all messages
 def show():
     for m in messages:
@@ -103,7 +88,7 @@ if __name__ == "__main__":
     try:
         print('Peer is running...')
         nickname = get_nickname()
-        (messages, following) = read_data()
+        (messages, following) = local_storage.read_data(db_file+nickname)  # TODO rm nickname (it's necessary for to allow tests in the same host)
         show()        
         
         loop.add_reader(sys.stdin, handle_stdin)
@@ -113,7 +98,6 @@ if __name__ == "__main__":
         pass
     finally:
         print('loop.close()')
-        save_data()
-        
+        local_storage.save_data(messages, following, db_file+nickname)    # TODO rm nickanme
         server.stop()
         loop.close()
