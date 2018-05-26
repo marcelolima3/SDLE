@@ -11,15 +11,15 @@ def start_node(Port, BTIp="", BTPort=0):
     handler.setFormatter(formatter)
     
     # DEBUG
-    log = logging.getLogger('kademlia')
-    log.addHandler(handler)
-    log.setLevel(logging.DEBUG)
+    #log = logging.getLogger('kademlia')
+    #log.addHandler(handler)
+    #log.setLevel(logging.DEBUG)
 
     server = Server()
     server.listen(Port)
 
     loop = asyncio.get_event_loop()
-    # loop.set_debug(True)
+    #loop.set_debug(True)
 
     # the first peer don't do that
     if not BTPort == 0:    

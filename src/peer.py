@@ -78,17 +78,17 @@ def build_user_info():
     asyncio.ensure_future(server.set(nickname, json.dumps(info)))
 
 
-@asyncio.coroutine
-def task_follow(user_id):
-    task = asyncio.ensure_future(server.get(user_id))
-    result = yield from asyncio.gather(task)
-    print(result[0])
+# @asyncio.coroutine
+async def task_follow(user_id):
+    #task = asyncio.ensure_future(server.get(user_id))
+    #result = yield from asyncio.gather(task)
+    result = await server.get(user_id)
 
-    if result[0] is None:
+    if result is None:
         print('That user doesn\'t exist!')
     else:
-        print('Exists')
-        userInfo = json.loads(result[0])
+        print('Following ' + user_id)
+        userInfo = json.loads(result)
         following.append({'id': user_id, 'ip': userInfo['ip']})
         userInfo['followers'].append({'id': nickname, 'ip': ip_address})
         asyncio.ensure_future(server.set(user_id, json.dumps(userInfo)))
@@ -98,7 +98,6 @@ def task_follow(user_id):
 def follow_user():
     user = input('User Nickname: ')
     user_id = user.replace('\n', '')
-    print('-'+user_id+'-')
     asyncio.async(task_follow(user_id))
 
     return False
