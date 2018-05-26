@@ -18,6 +18,7 @@ messages = []
 following = []
 db_file = 'db'
 
+
 # handler process IO request
 def handle_stdin():
     data = sys.stdin.readline()
@@ -104,19 +105,10 @@ def follow_user():
     user = input('User Nickname: ')
     user_id = user.replace('\n', '')
     asyncio.async(task_follow(user_id))
-
     return False
 
 
-# Get user real ip
-def get_ip_address():
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s.connect(("8.8.8.8", 80))
-    ip = s.getsockname()[0]
-    s.close()
-    return ip
-
-
+# show own timeline 
 def show_timeline():
     for m in messages:
         print(m['id'] + ' - ' + m['message'])
@@ -143,6 +135,15 @@ def build_menu():
     menu.add_item(Item('3 - Send message', send_msg))
     menu.add_item(Item('0 - Exit', exit_loop))
     return menu
+
+
+# Get user real ip
+def get_ip_address():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.connect(("8.8.8.8", 80))
+    ip = s.getsockname()[0]
+    s.close()
+    return ip
 
 
 """ MAIN """
