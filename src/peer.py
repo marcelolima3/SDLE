@@ -7,12 +7,13 @@ import json
 from LocalStorage import local_storage
 from DHT import node
 from P2P import Connection
-from Menu.Menu import Menu as menu
-from Menu import Menu as m_menu
+from Menu.Menu import Menu
+from Menu.Item import Item
 
 # -- Global VARS --
 queue = asyncio.Queue()
 nickname = ""
+ip_address = ""
 messages = []
 following = []
 db_file = 'db'
@@ -46,7 +47,6 @@ def start():
 # get the nickname
 def get_nickname():
     nick = input('Nickname: ')
-    # return sys.stdin.readline().replace('\n', '')
     return nick.replace('\n', '')
 
 
@@ -54,13 +54,7 @@ def get_nickname():
 def check_argv():
     if len(sys.argv) < 2:
         print("Usage: python get.py <port> [<bootstrap ip> <bootstrap port>]")
-        sys.exit(1)
-
-
-# print all messages
-def show():
-    for m in messages:
-        print(m['id'] + ' - ' + m['message'])
+        sys.exit(1)    
 
 
 # get timeline to the followings TODO
@@ -80,22 +74,24 @@ def check_vector_clocks():
 
 # build a json with user info and put it in the DHT
 def build_user_info():
-    info = {'ip': get_ip_address(), 'followers': [], 'vector_clock': []}
+    info = {'ip': ip_address, 'followers': [], 'vector_clock': []}
     asyncio.ensure_future(server.set(nickname, json.dumps(info)))
 
 
 # follow a user. After, he can be found in the list "following"
 def follow_user():
-    print('User Nickname: ')
-    user_id = sys.stdin.readline().replace('\n', '')
-    userInfoJson = asyncio.ensure_future(server.get(user_id))
-    if userInfoJson is None:
+    user = input('User Nickname: ')
+    user_id = user.replace('\n', '')
+    task = loop.run_until_complete(server.get(user_id))
+    print(task)
+    if task is None:
         print('That user doesn\'t exist!')
     else:
-        userInfo = json.loads(userInfoJson)
+        userInfo = json.loads(task)
         following.append({'id': user_id, 'ip': userInfo['ip']})
-        userInfo['followers'].append({'id': nickname, 'ip': get_ip_address()})
+        userInfo['followers'].append({'id': nickname, 'ip': ip_address})
         asyncio.ensure_future(server.set(user_id, json.dumps(userInfo)))
+    return False
 
 
 # Get user real ip
@@ -107,21 +103,48 @@ def get_ip_address():
     return ip
 
 
+def show_timeline():
+    for m in messages:
+        print(m['id'] + ' - ' + m['message'])
+    return False    
+
+
+# send message to the followers
+def send_msg():
+    msg = input('Insert message: ')
+    print(msg)
+    return False 
+
+
+# exit app 
+def exit_loop():
+    return True
+
+
+# build the Menu
+def build_menu():
+    menu = Menu('Menu')
+    menu.add_item(Item('1 - Show timeline', show_timeline))
+    menu.add_item(Item('2 - Follow username', follow_user))
+    menu.add_item(Item('3 - Send message', send_msg))
+    menu.add_item(Item('0 - Exit', exit_loop))
+    return menu
+
+
 """ MAIN """
 if __name__ == "__main__":
     check_argv()
     (server, loop) = start()
-
     try:
         print('Peer is running...')
-        
         nickname = get_nickname()                                           # Get nickname from user 
+        ip_address = get_ip_address()                                       # Get ip address from user
         (messages, following) = local_storage.read_data(db_file+nickname)   # TODO rm nickname (it's necessary for to allow tests in the same host
        
         loop.add_reader(sys.stdin, handle_stdin)                            # Register handler to read STDIN
         build_user_info()                                                   # Register in DHT user info
         
-        m = m_menu.build_menu(loop)
+        m = build_menu()
         asyncio.async(task(server, loop, nickname, m))                      # Register handler to consume the queue
         loop.run_forever()                                                  # Keeps the user online 
     except Exception:
