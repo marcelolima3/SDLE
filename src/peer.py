@@ -74,7 +74,7 @@ def check_vector_clocks():
 
 # build a json with user info and put it in the DHT
 def build_user_info():
-    info = {'ip': ip_address, 'followers': [], 'vector_clock': []}
+    info = {'ip': ip_address, 'followers': {}, 'vector_clock': []}
     asyncio.ensure_future(server.set(nickname, json.dumps(info)))
 
 
@@ -83,15 +83,20 @@ async def task_follow(user_id):
     #task = asyncio.ensure_future(server.get(user_id))
     #result = yield from asyncio.gather(task)
     result = await server.get(user_id)
-
+    
     if result is None:
         print('That user doesn\'t exist!')
-    else:
-        print('Following ' + user_id)
+    else: 
         userInfo = json.loads(result)
-        following.append({'id': user_id, 'ip': userInfo['ip']})
-        userInfo['followers'].append({'id': nickname, 'ip': ip_address})
-        asyncio.ensure_future(server.set(user_id, json.dumps(userInfo)))
+        print(userInfo)
+        try:
+            if userInfo['followers'][nickname]:
+                print('You\'re following him!')
+        except Exception:
+            print('Following ' + user_id)
+            following.append({'id': user_id, 'ip': userInfo['ip']})
+            userInfo['followers'][nickname] = ip_address
+            asyncio.ensure_future(server.set(user_id, json.dumps(userInfo)))
 
 
 # follow a user. After, he can be found in the list "following"

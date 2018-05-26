@@ -11,9 +11,9 @@ def start_node(Port, BTIp="", BTPort=0):
     handler.setFormatter(formatter)
     
     # DEBUG
-    #log = logging.getLogger('kademlia')
-    #log.addHandler(handler)
-    #log.setLevel(logging.DEBUG)
+    log = logging.getLogger('kademlia')
+    log.addHandler(handler)
+    log.setLevel(logging.DEBUG)
 
     server = Server()
     server.listen(Port)
