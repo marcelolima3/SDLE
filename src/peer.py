@@ -7,13 +7,15 @@ import json
 from LocalStorage import local_storage
 from DHT import node
 from P2P import Connection
+from Menu.Menu import Menu as menu
+from Menu import Menu as m_menu
 
+# -- Global VARS --
 queue = asyncio.Queue()
 nickname = ""
 messages = []
 following = []
 db_file = 'db'
-
 
 # handler process IO request
 def handle_stdin():
@@ -23,16 +25,14 @@ def handle_stdin():
 
 # process all messages into the Queue
 @asyncio.coroutine
-def task(server, loop, nickname):
+def task(server, loop, nickname, menu):
+    menu.draw()
     while True:
         msg = yield from queue.get()
-        messages.append({
-            'id' : nickname,
-            'message': msg.replace('\n', '')
-        })
-        asyncio.ensure_future(server.set(nickname, msg))
-        # TODO supposed to be a json file with the user info
-        # build a menu with options like "tweet", "follow user", "leave"
+        if menu.run(int(msg)):
+            break
+        menu.draw()
+    loop.call_soon_threadsafe(loop.stop)
 
 
 # start peer or not as Bootstrap
@@ -45,8 +45,9 @@ def start():
 
 # get the nickname
 def get_nickname():
-    print('Nickname: ')
-    return sys.stdin.readline().replace('\n', '')
+    nick = input('Nickname: ')
+    # return sys.stdin.readline().replace('\n', '')
+    return nick.replace('\n', '')
 
 
 # check if the number of args is valid
@@ -113,18 +114,20 @@ if __name__ == "__main__":
 
     try:
         print('Peer is running...')
-        nickname = get_nickname()
-        (messages, following) = local_storage.read_data(db_file+nickname)  # TODO rm nickname (it's necessary for to allow tests in the same host)
-        build_user_info()
-        show()
-
-        loop.add_reader(sys.stdin, handle_stdin)
-        asyncio.async(task(server, loop, nickname))
-        loop.run_forever()
-    except KeyboardInterrupt:
+        
+        nickname = get_nickname()                                           # Get nickname from user 
+        (messages, following) = local_storage.read_data(db_file+nickname)   # TODO rm nickname (it's necessary for to allow tests in the same host
+       
+        loop.add_reader(sys.stdin, handle_stdin)                            # Register handler to read STDIN
+        build_user_info()                                                   # Register in DHT user info
+        
+        m = m_menu.build_menu(loop)
+        asyncio.async(task(server, loop, nickname, m))                      # Register handler to consume the queue
+        loop.run_forever()                                                  # Keeps the user online 
+    except Exception:
         pass
     finally:
-        print('loop.close()')
-        local_storage.save_data(messages, following, db_file+nickname)    # TODO rm nickname
+        print('Good Bye!')
+        local_storage.save_data(messages, following, db_file+nickname)      # TODO rm nickname
         server.stop()
         loop.close()

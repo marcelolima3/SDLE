@@ -1,5 +1,4 @@
-from Item import Item 
-import os 
+from Menu.Item import Item
 
 class Menu:
     def __init__(self, name, items=None):
@@ -19,31 +18,37 @@ class Menu:
             item.draw()
         print('____________________________________')
 
-    def run(self):
-        self.draw()
-        while True:
-            option = int(input('> '))
-            if option is 0 or option > len(self.items) - 1: 
-                break
-            else:
-                self.items[option-1].execute()
-                self.draw()
+    def run(self, option):
+        if not option > len(self.items) - 1: 
+            return self.items[option-1].execute()
+
 
 def show_timeline_example():
     print('timeline')
+    return False
+
 
 def follow_example():
     msg = input('Insert username: ')
     print(msg)
+    return False
+
 
 def send_msg_example():
     msg = input('Insert message: ')
-    print(msg)    
+    print(msg)
+    return False 
 
-if __name__ == "__main__":
+
+def exit_loop():
+    print('exit loop')
+    return True
+
+
+def build_menu(loop):
     menu = Menu('Menu')
     menu.add_item(Item('1 - Show timeline', show_timeline_example))
     menu.add_item(Item('2 - Follow username', follow_example))
     menu.add_item(Item('3 - Send message', send_msg_example))
-    menu.add_item(Item('0 - Exit', ''))
-    menu.run()      
+    menu.add_item(Item('0 - Exit', exit_loop))
+    return menu
