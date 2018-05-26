@@ -1,4 +1,4 @@
-from Connection import Connection
+from P2P.Connection import Connection
 import sys
 
 destination = 'localhost'

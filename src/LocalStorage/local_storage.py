@@ -1,15 +1,5 @@
 import argparse, json
 
-# Messages example
-messages = [
-    {'id': 'tone', 'message': 'olá mundo'},
-    {'id': 'zé', 'message': '😁'},
-    {'id': 'manel', 'message': 'adeus mundo!'}
-]
-
-# Following example
-following = [{'id': 'antonio', 'ip': '192.168.1.69'}]
-
 
 # Convert data to JSON
 def __dataToJson(messages, following):
