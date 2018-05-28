@@ -3,26 +3,123 @@ import asyncio
 import sys
 import socket
 import json
+from threading import Thread
 
+#from Menu.MenuFunctionalities import build_menu, get_nickname, follow_user, show_timeline, send_msg, exit_loop
+#from async_tasks import task, task_follow, task_send_msg, get_followers_p2p
 from LocalStorage import local_storage
 from DHT import node
-from P2P import Connection
+from P2P.Connection import Connection
 from Menu.Menu import Menu
 from Menu.Item import Item
 
 # -- Global VARS --
 queue = asyncio.Queue()
+p2p_port = ""
 nickname = ""
 ip_address = ""
 messages = []
 following = []
 db_file = 'db'
 
+# process all messages into the Queue
+@asyncio.coroutine
+def task(server, loop, nickname, menu):
+    menu.draw()
+    while True:
+        msg = yield from queue.get()
+        if not msg == '\n' and menu.run(int(msg)):
+            break
+        menu.draw()
+    loop.call_soon_threadsafe(loop.stop)
 
-# handler process IO request
-def handle_stdin():
-    data = sys.stdin.readline()
-    asyncio.async(queue.put(data)) # Queue.put is a coroutine, so you can't call it directly.
+
+async def task_follow(user_id):
+    result = await server.get(user_id)
+    
+    if result is None:
+        print('That user doesn\'t exist!')
+    else: 
+        userInfo = json.loads(result)
+        print(userInfo)
+        try:
+            if userInfo['followers'][nickname]:
+                print('You\'re following him!')
+        except Exception:
+            print('Following ' + user_id)
+            following.append({'id': user_id, 'ip': userInfo['ip']}) # é preciso guardar a porta dos que eu sigo? 
+            userInfo['followers'][nickname] = f'{ip_address} {p2p_port}'
+            print(f"{user_id} ----> {userInfo['followers'][nickname]}")
+            asyncio.ensure_future(server.set(user_id, json.dumps(userInfo)))
+
+
+# get followers port's
+async def get_followers_p2p():
+    connection_info = []
+    result = await server.get(nickname)
+
+    if result is None:
+        print('ERROR - Why don\'t I belong to the DHT?')
+    else: 
+        userInfo = json.loads(result)
+        print(userInfo)
+        for user, info in userInfo['followers'].items():
+            print(info)
+            connection_info.append(info)
+    return connection_info
+
+
+async def task_send_msg(msg):
+    connection_info = await get_followers_p2p()
+    print('CONNECTION INFO (Ip, Port)')
+    for follower in connection_info:
+        print(follower)
+        info = follower.split()
+        send_p2p_msg(info[0], int(info[1]), msg)            
+
+# build the Menu
+def build_menu():
+    menu = Menu('Menu')
+    menu.add_item(Item('1 - Show timeline', show_timeline))
+    menu.add_item(Item('2 - Follow username', follow_user))
+    menu.add_item(Item('3 - Send message', send_msg))
+    menu.add_item(Item('0 - Exit', exit_loop))
+    return menu
+
+
+# get the nickname
+def get_nickname():
+    nick = input('Nickname: ')
+    return nick.replace('\n', '')
+
+
+# follow a user. After, he can be found in the list "following"
+def follow_user():
+    user = input('User Nickname: ')
+    user_id = user.replace('\n', '')
+    asyncio.async(task_follow(user_id))
+    return False
+
+
+# show own timeline 
+def show_timeline():
+    for m in messages:
+        print(m['id'] + ' - ' + m['message'])
+    return False   
+
+
+# send message to the followers
+def send_msg():
+    msg = input('Insert message: ')
+    msg = msg.replace('\n','')
+    print(msg)
+    asyncio.async(task_send_msg(msg))
+    return False 
+
+
+# exit app 
+def exit_loop():
+    return True
 
 
 # process all messages into the Queue
@@ -37,24 +134,24 @@ def task(server, loop, nickname, menu):
     loop.call_soon_threadsafe(loop.stop)
 
 
+# handler process IO request
+def handle_stdin():
+    data = sys.stdin.readline()
+    asyncio.async(queue.put(data)) # Queue.put is a coroutine, so you can't call it directly.
+
+
 # start peer or not as Bootstrap
 def start():
-    if len(sys.argv) > 2:
-        return node.start_node(int(sys.argv[1]), sys.argv[2], int(sys.argv[3]))
+    if len(sys.argv) > 3:
+        return node.start_node(int(sys.argv[1]), sys.argv[3], int(sys.argv[4]))
     else:
         return node.start_node(int(sys.argv[1]))
 
 
-# get the nickname
-def get_nickname():
-    nick = input('Nickname: ')
-    return nick.replace('\n', '')
-
-
 # check if the number of args is valid
 def check_argv():
-    if len(sys.argv) < 2:
-        print("Usage: python get.py <port> [<bootstrap ip> <bootstrap port>]")
+    if len(sys.argv) < 3:
+        print("Usage: python get.py <port_dht> <port_p2p> [<bootstrap ip> <bootstrap port>]")
         sys.exit(1)    
 
 
@@ -75,66 +172,8 @@ def check_vector_clocks():
 
 # build a json with user info and put it in the DHT
 def build_user_info():
-    info = {'ip': ip_address, 'followers': {}, 'vector_clock': []}
+    info = {'ip': ip_address, 'port': p2p_port, 'followers': {}, 'vector_clock': []}
     asyncio.ensure_future(server.set(nickname, json.dumps(info)))
-
-
-# @asyncio.coroutine
-async def task_follow(user_id):
-    #task = asyncio.ensure_future(server.get(user_id))
-    #result = yield from asyncio.gather(task)
-    result = await server.get(user_id)
-    
-    if result is None:
-        print('That user doesn\'t exist!')
-    else: 
-        userInfo = json.loads(result)
-        print(userInfo)
-        try:
-            if userInfo['followers'][nickname]:
-                print('You\'re following him!')
-        except Exception:
-            print('Following ' + user_id)
-            following.append({'id': user_id, 'ip': userInfo['ip']})
-            userInfo['followers'][nickname] = ip_address
-            asyncio.ensure_future(server.set(user_id, json.dumps(userInfo)))
-
-
-# follow a user. After, he can be found in the list "following"
-def follow_user():
-    user = input('User Nickname: ')
-    user_id = user.replace('\n', '')
-    asyncio.async(task_follow(user_id))
-    return False
-
-
-# show own timeline 
-def show_timeline():
-    for m in messages:
-        print(m['id'] + ' - ' + m['message'])
-    return False    
-
-
-# send message to the followers
-def send_msg():
-    msg = input('Insert message: ')
-    print(msg)
-    return False 
-
-
-# exit app 
-def exit_loop():
-    return True
-
-
-# build the Menu
-def build_menu():
-    menu = Menu('Menu')
-    menu.add_item(Item('1 - Show timeline', show_timeline))
-    menu.add_item(Item('2 - Follow username', follow_user))
-    menu.add_item(Item('3 - Send message', send_msg))
-    menu.add_item(Item('0 - Exit', exit_loop))
-    return menu
 
 
 # Get user real ip
@@ -145,14 +184,26 @@ def get_ip_address():
     s.close()
     return ip
 
+def start_p2p_listenner(port):
+    connection = Connection(get_ip_address(), port)
+    connection.bind()
+    connection.listen()
+
+def send_p2p_msg(ip, port, message):
+    connection = Connection(ip, port)  
+    connection.connect()
+    connection.send(message)
 
 """ MAIN """
 if __name__ == "__main__":
     check_argv()
+    p2p_port = sys.argv[2]
+    thread = Thread(target = start_p2p_listenner, args = ( int(p2p_port), ))
     (server, loop) = start()
     try:
         print('Peer is running...')
         nickname = get_nickname()                                           # Get nickname from user 
+        thread.start()
         ip_address = get_ip_address()                                       # Get ip address from user
         (messages, following) = local_storage.read_data(db_file+nickname)   # TODO rm nickname (it's necessary for to allow tests in the same host
        
