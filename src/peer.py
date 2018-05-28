@@ -4,6 +4,7 @@ import sys
 import socket
 import json
 from threading import Thread
+import threading
 
 #from Menu.MenuFunctionalities import build_menu, get_nickname, follow_user, show_timeline, send_msg, exit_loop
 #from async_tasks import task, task_follow, task_send_msg, get_followers_p2p
@@ -12,6 +13,7 @@ from DHT import node
 from P2P.Connection import Connection
 from Menu.Menu import Menu
 from Menu.Item import Item
+import async_tasks
 
 # -- Global VARS --
 queue = asyncio.Queue()
@@ -22,60 +24,11 @@ messages = []
 following = []
 db_file = 'db'
 
-# process all messages into the Queue
-@asyncio.coroutine
-def task(server, loop, nickname, menu):
-    menu.draw()
-    while True:
-        msg = yield from queue.get()
-        if not msg == '\n' and menu.run(int(msg)):
-            break
-        menu.draw()
-    loop.call_soon_threadsafe(loop.stop)
+# handler process IO request
+def handle_stdin():
+    data = sys.stdin.readline()
+    asyncio.async(queue.put(data)) # Queue.put is a coroutine, so you can't call it directly.       
 
-
-async def task_follow(user_id):
-    result = await server.get(user_id)
-    
-    if result is None:
-        print('That user doesn\'t exist!')
-    else: 
-        userInfo = json.loads(result)
-        print(userInfo)
-        try:
-            if userInfo['followers'][nickname]:
-                print('You\'re following him!')
-        except Exception:
-            print('Following ' + user_id)
-            following.append({'id': user_id, 'ip': userInfo['ip']}) # é preciso guardar a porta dos que eu sigo? 
-            userInfo['followers'][nickname] = f'{ip_address} {p2p_port}'
-            print(f"{user_id} ----> {userInfo['followers'][nickname]}")
-            asyncio.ensure_future(server.set(user_id, json.dumps(userInfo)))
-
-
-# get followers port's
-async def get_followers_p2p():
-    connection_info = []
-    result = await server.get(nickname)
-
-    if result is None:
-        print('ERROR - Why don\'t I belong to the DHT?')
-    else: 
-        userInfo = json.loads(result)
-        print(userInfo)
-        for user, info in userInfo['followers'].items():
-            print(info)
-            connection_info.append(info)
-    return connection_info
-
-
-async def task_send_msg(msg):
-    connection_info = await get_followers_p2p()
-    print('CONNECTION INFO (Ip, Port)')
-    for follower in connection_info:
-        print(follower)
-        info = follower.split()
-        send_p2p_msg(info[0], int(info[1]), msg)            
 
 # build the Menu
 def build_menu():
@@ -97,7 +50,7 @@ def get_nickname():
 def follow_user():
     user = input('User Nickname: ')
     user_id = user.replace('\n', '')
-    asyncio.async(task_follow(user_id))
+    asyncio.async(async_tasks.task_follow(user_id, nickname, server, following, ip_address, p2p_port))
     return False
 
 
@@ -113,31 +66,12 @@ def send_msg():
     msg = input('Insert message: ')
     msg = msg.replace('\n','')
     print(msg)
-    asyncio.async(task_send_msg(msg))
+    asyncio.async(async_tasks.task_send_msg(msg, server, nickname))
     return False 
-
 
 # exit app 
 def exit_loop():
     return True
-
-
-# process all messages into the Queue
-@asyncio.coroutine
-def task(server, loop, nickname, menu):
-    menu.draw()
-    while True:
-        msg = yield from queue.get()
-        if not msg == '\n' and menu.run(int(msg)):
-            break
-        menu.draw()
-    loop.call_soon_threadsafe(loop.stop)
-
-
-# handler process IO request
-def handle_stdin():
-    data = sys.stdin.readline()
-    asyncio.async(queue.put(data)) # Queue.put is a coroutine, so you can't call it directly.
 
 
 # start peer or not as Bootstrap
@@ -184,21 +118,18 @@ def get_ip_address():
     s.close()
     return ip
 
-def start_p2p_listenner(port):
+def start_p2p_listenner(port, stop_event):
     connection = Connection(get_ip_address(), port)
     connection.bind()
-    connection.listen()
+    connection.listen(stop_event)
 
-def send_p2p_msg(ip, port, message):
-    connection = Connection(ip, port)  
-    connection.connect()
-    connection.send(message)
 
 """ MAIN """
 if __name__ == "__main__":
     check_argv()
     p2p_port = sys.argv[2]
-    thread = Thread(target = start_p2p_listenner, args = ( int(p2p_port), ))
+    pill2kill = threading.Event()
+    thread = Thread(target = start_p2p_listenner, args = ( int(p2p_port), pill2kill, ))
     (server, loop) = start()
     try:
         print('Peer is running...')
@@ -211,12 +142,13 @@ if __name__ == "__main__":
         build_user_info()                                                   # Register in DHT user info
         
         m = build_menu()
-        asyncio.async(task(server, loop, nickname, m))                      # Register handler to consume the queue
+        asyncio.async(async_tasks.task(server, loop, nickname, m, queue))   # Register handler to consume the queue
         loop.run_forever()                                                  # Keeps the user online 
     except Exception:
         pass
     finally:
         print('Good Bye!')
         local_storage.save_data(messages, following, db_file+nickname)      # TODO rm nickname
-        server.stop()
-        loop.close()
+        pill2kill.set()                                                     # Stop the thread with P2P Connection 
+        server.stop()                                                       # Stop the server with DHT Kademlia
+        loop.close()                                                        # Stop the async loop

@@ -1,8 +1,9 @@
-import asyncio
+import asyncio, json
+from P2P.Connection import Connection
 
 # process all messages into the Queue
 @asyncio.coroutine
-def task(server, loop, nickname, menu):
+def task(server, loop, nickname, menu, queue):
     menu.draw()
     while True:
         msg = yield from queue.get()
@@ -12,7 +13,7 @@ def task(server, loop, nickname, menu):
     loop.call_soon_threadsafe(loop.stop)
 
 
-async def task_follow(user_id):
+async def task_follow(user_id, nickname, server, following, ip_address, p2p_port):
     result = await server.get(user_id)
     
     if result is None:
@@ -32,7 +33,7 @@ async def task_follow(user_id):
 
 
 # get followers port's
-async def get_followers_p2p():
+async def get_followers_p2p(server, nickname):
     connection_info = []
     result = await server.get(nickname)
 
@@ -47,10 +48,16 @@ async def get_followers_p2p():
     return connection_info
 
 
-async def task_send_msg(msg):
-    connection_info = await get_followers_p2p()
+async def task_send_msg(msg, server, nickname):
+    connection_info = await get_followers_p2p(server, nickname)
     print('CONNECTION INFO (Ip, Port)')
     for follower in connection_info:
         print(follower)
         info = follower.split()
         send_p2p_msg(info[0], int(info[1]), msg)            
+
+
+def send_p2p_msg(ip, port, message):
+    connection = Connection(ip, port)  
+    connection.connect()
+    connection.send(message)

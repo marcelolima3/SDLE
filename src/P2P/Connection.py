@@ -22,10 +22,10 @@ class Connection:
 
 
     # put the socket in "Listen" mode
-    def listen(self):
+    def listen(self, stop_event):
         self.sock.listen(1)
 
-        while True:
+        while not stop_event:
             print('waiting for a connection')
             connection, client_address = self.sock.accept()
             manager = threading.Thread(target=self.__process_request, args=(connection, client_address,))
