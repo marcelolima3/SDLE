@@ -64,7 +64,7 @@ def show_timeline():
 def send_msg():
     msg = input('Insert message: ')
     msg = msg.replace('\n','')
-    timeline.append(msg)
+    timeline.append({'id': nickname, 'message': msg})
     print(msg)
     result = builder.simple_msg(msg, nickname)
     asyncio.async(async_tasks.task_send_msg(result, server, nickname, vector_clock))
@@ -151,6 +151,7 @@ async def build_user_info():
     exists = await server.get(nickname)                                 #check if user exists in DHT
     if exists is None:
         info = builder.user_info(nickname, ip_address, p2p_port)
+        vector_clock[nickname] = 0
         asyncio.ensure_future(server.set(nickname, info))
 
 
@@ -164,18 +165,17 @@ def get_ip_address():
 
 
 # put the peer in "Listen mode" for new connections
-def start_p2p_listenner(port, stop_event):
-    connection = Connection(get_ip_address(), port, timeline, following)
+def start_p2p_listenner(port):
+    connection = Connection(get_ip_address(), port)
     connection.bind()
-    connection.listen(stop_event)
+    connection.listen(timeline)
 
 
 """ MAIN """
 if __name__ == "__main__":
     check_argv()
     p2p_port = sys.argv[2]
-    pill2kill = threading.Event()
-    thread = Thread(target = start_p2p_listenner, args = (int(p2p_port), pill2kill, ))
+    thread = Thread(target = start_p2p_listenner, args = (int(p2p_port), ))
     (server, loop) = start()
     try:
         print('Peer is running...')
@@ -196,6 +196,6 @@ if __name__ == "__main__":
     finally:
         print('Good Bye!')
         local_storage.save_data(timeline, following, db_file+nickname)      # TODO rm nickname
-        pill2kill.set()                                                     # Stop the thread with P2P Connection
         server.stop()                                                       # Stop the server with DHT Kademlia
         loop.close()                                                        # Stop the async loop
+        sys.exit(1)                                                      

@@ -1,12 +1,10 @@
-import socket, sys, threading, json
+import socket, sys, threading, json, asyncio
 
 class Connection:
-    def __init__(self, host, port, timeline, following):
+    def __init__(self, host, port):
         self.host = host
         self.port = port
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.timeline = timeline
-        self.following = following 
 
 
     # bind an address
@@ -22,49 +20,15 @@ class Connection:
 
 
     # put the socket in "Listen" mode
-    def listen(self, stop_event):
+    def listen(self, timeline):
         self.sock.listen(1)
 
         #while not stop_event:
         while True:
             print('waiting for a connection')
             connection, client_address = self.sock.accept()
-            manager = threading.Thread(target=self.__process_request, args=(connection, client_address,))
+            manager = threading.Thread(target=process_request, args=(connection, client_address, timeline))
             manager.start()
-
-
-    # process the request, i.e., read the msg from socket (Thread)
-    def __process_request(self, connection, client_address):
-        try:
-            print('connection from', client_address)
-            while True:
-                data = connection.recv(1024)
-                if data:
-                    print('received "%s"' % data.decode('utf-8'))
-                    result = self.__process_message(data)
-                    connection.sendall(result)
-                else:
-                    break
-        finally:
-            connection.close()
-
-
-    def __process_message(self, data):
-        info = json.loads(data)
-        if info['type'] is 'simple':
-            self.timeline.append({'id': info['id'], 'message': info['msg']})
-            return 'ACK'.encode('utf-8')
-        elif info['type'] is 'timeline':
-            list = self.__get_messages(info['id'])
-            return json.loads(list)
-     
-
-    def __get_messages(self, id):
-        list = []
-        for m in self.timeline:
-            if m['id'] is id:
-                list.append(m)
-        return list
 
 
     # send a message to the other peer
@@ -77,3 +41,37 @@ class Connection:
         finally:
             print('closing socket')
             self.sock.close()
+
+
+# process the request, i.e., read the msg from socket (Thread)
+def process_request(connection, client_address, timeline):
+    try:
+        print('connection from', client_address)
+        while True:
+            data = connection.recv(1024)
+            if data:
+                print('received "%s"' % data.decode('utf-8'))
+                result = process_message(data, timeline)
+                connection.sendall(result)
+            else:
+                break
+    finally:
+        connection.close()
+
+
+def process_message( data, timeline):
+    info = json.loads(data)
+    if info['type'] == 'simple':
+        timeline.append({'id': info['id'], 'message': info['msg']})
+        return 'ACK'.encode('utf-8')
+    elif info['type'] == 'timeline':
+        list = get_messages(info['id'], timeline)
+        return json.loads(list)
+    
+
+def get_messages(id, timeline):
+    list = []
+    for m in timeline:
+        if m['id'] is id:
+            list.append(m)
+    return list
