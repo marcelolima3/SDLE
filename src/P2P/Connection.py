@@ -1,12 +1,12 @@
-import socket
-import sys
-import threading
+import socket, sys, threading, json
 
 class Connection:
-    def __init__(self, host, port):
+    def __init__(self, host, port, timeline, following):
         self.host = host
         self.port = port
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.timeline = timeline
+        self.following = following 
 
 
     # bind an address
@@ -38,15 +38,33 @@ class Connection:
         try:
             print('connection from', client_address)
             while True:
-                data = connection.recv(128)
+                data = connection.recv(1024)
                 if data:
                     print('received "%s"' % data.decode('utf-8'))
-                    connection.sendall('ACK'.encode('utf-8'))
+                    result = self.__process_message(data)
+                    connection.sendall(result)
                 else:
-                    print('no more data from', client_address)
                     break
         finally:
             connection.close()
+
+
+    def __process_message(self, data):
+        info = json.loads(data)
+        if info['type'] is 'simple':
+            self.timeline.append({'id': info['id'], 'message': info['msg']})
+            return 'ACK'.encode('utf-8')
+        elif info['type'] is 'timeline':
+            list = self.__get_messages(info['id'])
+            return json.loads(list)
+     
+
+    def __get_messages(self, id):
+        list = []
+        for m in self.timeline:
+            if m['id'] is id:
+                list.append(m)
+        return list
 
 
     # send a message to the other peer

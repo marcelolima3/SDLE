@@ -1,11 +1,5 @@
-import logging
-import asyncio
-import sys
-import socket
-import json
+import logging, asyncio, sys, socket, json, threading, random
 from threading import Thread
-import threading
-import random
 
 #from Menu.MenuFunctionalities import build_menu, get_nickname, follow_user, show_timeline, send_msg, exit_loop
 #from async_tasks import task, task_follow, task_send_msg, get_followers_p2p
@@ -15,15 +9,19 @@ from P2P.Connection import Connection
 from Menu.Menu import Menu
 from Menu.Item import Item
 import async_tasks
+import builder
+
 
 # -- Global VARS --
 queue = asyncio.Queue()
 p2p_port = ""
 nickname = ""
 ip_address = ""
-messages = []
+timeline = []
 following = []
+vector_clock = {}
 db_file = 'db'
+
 
 # handler process IO request
 def handle_stdin():
@@ -51,13 +49,13 @@ def get_nickname():
 def follow_user():
     user = input('User Nickname: ')
     user_id = user.replace('\n', '')
-    asyncio.async(async_tasks.task_follow(user_id, nickname, server, following, ip_address, p2p_port))
+    asyncio.async(async_tasks.task_follow(user_id, nickname, server, following, ip_address, p2p_port, vector_clock))
     return False
 
 
 # show own timeline
 def show_timeline():
-    for m in messages:
+    for m in timeline:
         print(m['id'] + ' - ' + m['message'])
     return False
 
@@ -66,10 +64,13 @@ def show_timeline():
 def send_msg():
     msg = input('Insert message: ')
     msg = msg.replace('\n','')
+    timeline.append(msg)
     print(msg)
-    asyncio.async(async_tasks.task_send_msg(msg, server, nickname))
+    result = builder.simple_msg(msg, nickname)
+    asyncio.async(async_tasks.task_send_msg(result, server, nickname, vector_clock))
 
     return False
+
 
 # exit app
 def exit_loop():
@@ -147,10 +148,10 @@ def check_vector_clocks():
 
 # build a json with user info and put it in the DHT
 async def build_user_info():
-    exists = await server.get(nickname) #check if user exists in DHT
+    exists = await server.get(nickname)                                 #check if user exists in DHT
     if exists is None:
-        info = {'ip': ip_address, 'port': p2p_port, 'followers': {}, 'vector_clock': {nickname: 0}}
-        asyncio.ensure_future(server.set(nickname, json.dumps(info)))
+        info = builder.user_info(nickname, ip_address, p2p_port)
+        asyncio.ensure_future(server.set(nickname, info))
 
 
 # Get user real ip
@@ -161,8 +162,10 @@ def get_ip_address():
     s.close()
     return ip
 
+
+# put the peer in "Listen mode" for new connections
 def start_p2p_listenner(port, stop_event):
-    connection = Connection(get_ip_address(), port)
+    connection = Connection(get_ip_address(), port, timeline, following)
     connection.bind()
     connection.listen(stop_event)
 
@@ -172,14 +175,14 @@ if __name__ == "__main__":
     check_argv()
     p2p_port = sys.argv[2]
     pill2kill = threading.Event()
-    thread = Thread(target = start_p2p_listenner, args = ( int(p2p_port), pill2kill, ))
+    thread = Thread(target = start_p2p_listenner, args = (int(p2p_port), pill2kill, ))
     (server, loop) = start()
     try:
         print('Peer is running...')
         nickname = get_nickname()                                           # Get nickname from user
         thread.start()
         ip_address = get_ip_address()                                       # Get ip address from user
-        (messages, following) = local_storage.read_data(db_file+nickname)   # TODO rm nickname (it's necessary for to allow tests in the same host
+        (timeline, following) = local_storage.read_data(db_file+nickname)   # TODO rm nickname (it's necessary for to allow tests in the same host
 
         loop.add_reader(sys.stdin, handle_stdin)                            # Register handler to read STDIN
         asyncio.async(build_user_info())                                    # Register in DHT user info
@@ -192,7 +195,7 @@ if __name__ == "__main__":
         pass
     finally:
         print('Good Bye!')
-        local_storage.save_data(messages, following, db_file+nickname)      # TODO rm nickname
+        local_storage.save_data(timeline, following, db_file+nickname)      # TODO rm nickname
         pill2kill.set()                                                     # Stop the thread with P2P Connection
         server.stop()                                                       # Stop the server with DHT Kademlia
         loop.close()                                                        # Stop the async loop

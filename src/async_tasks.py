@@ -13,7 +13,7 @@ def task(server, loop, nickname, menu, queue):
     loop.call_soon_threadsafe(loop.stop)
 
 
-async def task_follow(user_id, nickname, server, following, ip_address, p2p_port):
+async def task_follow(user_id, nickname, server, following, ip_address, p2p_port, vector_clock):
     result = await server.get(user_id)
 
     if result is None:
@@ -33,7 +33,7 @@ async def task_follow(user_id, nickname, server, following, ip_address, p2p_port
 
 
 # get followers port's
-async def get_followers_p2p(server, nickname):
+async def get_followers_p2p(server, nickname, vector_clock):
     connection_info = []
     result = await server.get(nickname)
 
@@ -43,15 +43,16 @@ async def get_followers_p2p(server, nickname):
         userInfo = json.loads(result)
         print(userInfo)
         userInfo['vector_clock'][nickname] += 1
+        vector_clock[nickname] += 1
         asyncio.ensure_future(server.set(nickname, json.dumps(userInfo)))
         for user, info in userInfo['followers'].items():
             connection_info.append(info)
     return connection_info
 
 
-async def task_send_msg(msg, server, nickname):
-    connection_info = await get_followers_p2p(server, nickname)
-    #print('CONNECTION INFO (Ip, Port)')
+async def task_send_msg(msg, server, nickname, vector_clock):
+    connection_info = await get_followers_p2p(server, nickname, vector_clock)
+    # print('CONNECTION INFO (Ip, Port)')
     for follower in connection_info:
         #print(follower)
         info = follower.split()
