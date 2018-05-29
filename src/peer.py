@@ -101,21 +101,26 @@ async def get_timeline():
 
 
 # temos de implementar o XOR
-def get_random_updated_follower(userInfo):
+async def get_random_updated_follower(userInfo):
     user_followers = userInfo['followers']
     while(user_followers):
         random_follower = random.choice(user_followers.keys())
-        random_follower_ip = userInfo['followers'][random_follower]
-        if userInfo['vector_clock'][random_follower] > userInfo['vector_clock'][nickname] and isOnline(random_follower_ip):
-            return random_follower_ip
+        random_follower_con = userInfo['followers'][random_follower]
+        info = random_follower_con.split()
+        if userInfo['vector_clock'][random_follower] > userInfo['vector_clock'][nickname] and isOnline(info[0], int(info[1])):
+            return random_follower_con
         user_followers.pop(random_follower)
     return None
 
 
 # check if a node is online
-def isOnline(userIP):
-    print('TODO')
-    return True
+def isOnline(userIP, userPort):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    result = sock.connect_ex(userIP, userPort)
+    if result == 0:
+        return True
+    else:
+        return False
 
 
 # send a message to a node asking for a specific timeline
