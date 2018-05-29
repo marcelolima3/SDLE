@@ -5,6 +5,7 @@ import socket
 import json
 from threading import Thread
 import threading
+import random
 
 #from Menu.MenuFunctionalities import build_menu, get_nickname, follow_user, show_timeline, send_msg, exit_loop
 #from async_tasks import task, task_follow, task_send_msg, get_followers_p2p
@@ -27,7 +28,7 @@ db_file = 'db'
 # handler process IO request
 def handle_stdin():
     data = sys.stdin.readline()
-    asyncio.async(queue.put(data)) # Queue.put is a coroutine, so you can't call it directly.       
+    asyncio.async(queue.put(data)) # Queue.put is a coroutine, so you can't call it directly.
 
 
 # build the Menu
@@ -54,11 +55,11 @@ def follow_user():
     return False
 
 
-# show own timeline 
+# show own timeline
 def show_timeline():
     for m in messages:
         print(m['id'] + ' - ' + m['message'])
-    return False   
+    return False
 
 
 # send message to the followers
@@ -67,9 +68,9 @@ def send_msg():
     msg = msg.replace('\n','')
     print(msg)
     asyncio.async(async_tasks.task_send_msg(msg, server, nickname))
-    return False 
+    return False
 
-# exit app 
+# exit app
 def exit_loop():
     return True
 
@@ -86,11 +87,39 @@ def start():
 def check_argv():
     if len(sys.argv) < 3:
         print("Usage: python get.py <port_dht> <port_p2p> [<bootstrap ip> <bootstrap port>]")
-        sys.exit(1)    
+        sys.exit(1)
 
 
 # get timeline to the followings TODO
-def get_timeline():
+async def get_timeline():
+    for user in following:
+        result = await server.get(user['id'])
+        userInfo = json.loads(result)
+        random_follower = get_random_updated_follower(userInfo)
+        if random_follower is not None:
+            ask_for_timeline(random_follower, user['id'])
+
+
+# temos de implementar o XOR
+def get_random_updated_follower(userInfo):
+    user_followers = userInfo['followers']
+    while(user_followers):
+        random_follower = random.choice(user_followers.keys())
+        random_follower_ip = userInfo['followers'][random_follower]
+        if userInfo['vector_clock'][random_follower] > userInfo['vector_clock'][nickname] and isOnline(random_follower_ip):
+            return random_follower_ip
+        user_followers.pop(random_follower)
+    return None
+
+
+# check if a node is online
+def isOnline(userIP):
+    print('TODO')
+    return True
+
+
+# send a message to a node asking for a specific timeline
+def ask_for_timeline(userIp, TLUser):
     print('TODO')
 
 
@@ -133,22 +162,22 @@ if __name__ == "__main__":
     (server, loop) = start()
     try:
         print('Peer is running...')
-        nickname = get_nickname()                                           # Get nickname from user 
+        nickname = get_nickname()                                           # Get nickname from user
         thread.start()
         ip_address = get_ip_address()                                       # Get ip address from user
         (messages, following) = local_storage.read_data(db_file+nickname)   # TODO rm nickname (it's necessary for to allow tests in the same host
-       
+
         loop.add_reader(sys.stdin, handle_stdin)                            # Register handler to read STDIN
         build_user_info()                                                   # Register in DHT user info
-        
+
         m = build_menu()
         asyncio.async(async_tasks.task(server, loop, nickname, m, queue))   # Register handler to consume the queue
-        loop.run_forever()                                                  # Keeps the user online 
+        loop.run_forever()                                                  # Keeps the user online
     except Exception:
         pass
     finally:
         print('Good Bye!')
         local_storage.save_data(messages, following, db_file+nickname)      # TODO rm nickname
-        pill2kill.set()                                                     # Stop the thread with P2P Connection 
+        pill2kill.set()                                                     # Stop the thread with P2P Connection
         server.stop()                                                       # Stop the server with DHT Kademlia
         loop.close()                                                        # Stop the async loop
