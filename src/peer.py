@@ -68,6 +68,7 @@ def send_msg():
     msg = msg.replace('\n','')
     print(msg)
     asyncio.async(async_tasks.task_send_msg(msg, server, nickname))
+
     return False
 
 # exit app
@@ -95,37 +96,43 @@ async def get_timeline():
     for user in following:
         result = await server.get(user['id'])
         userInfo = json.loads(result)
-        random_follower = get_random_updated_follower(userInfo)
+        random_follower = await get_random_updated_follower(userInfo)
         if random_follower is not None:
             ask_for_timeline(random_follower, user['id'])
 
 
 # temos de implementar o XOR
 async def get_random_updated_follower(userInfo):
+    print("RANDOM FOLLOWER")
     user_followers = userInfo['followers']
     while(user_followers):
-        random_follower = random.choice(user_followers.keys())
+        random_follower = random.choice(list(user_followers.keys()))
         random_follower_con = userInfo['followers'][random_follower]
         info = random_follower_con.split()
-        if userInfo['vector_clock'][random_follower] > userInfo['vector_clock'][nickname] and isOnline(info[0], int(info[1])):
+        if userInfo['vector_clock'][random_follower] >= userInfo['vector_clock'][nickname] and random_follower != nickname and isOnline(info[0], int(info[1])):
+            print("FOUND")
             return random_follower_con
         user_followers.pop(random_follower)
+    print("FAILED")
     return None
 
 
 # check if a node is online
 def isOnline(userIP, userPort):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    result = sock.connect_ex(userIP, userPort)
+    result = sock.connect_ex((userIP, userPort))
     if result == 0:
+        print("IS ONLINE" + userIP)
         return True
     else:
+        print("NOT ONLINE" + userIP)
         return False
 
 
 # send a message to a node asking for a specific timeline
 def ask_for_timeline(userIp, TLUser):
-    print('TODO')
+    print(TLUser)
+    print('ASKING FOR TIMELINE')
 
 
 # merge all timelines TODO
@@ -139,9 +146,11 @@ def check_vector_clocks():
 
 
 # build a json with user info and put it in the DHT
-def build_user_info():
-    info = {'ip': ip_address, 'port': p2p_port, 'followers': {}, 'vector_clock': []}
-    asyncio.ensure_future(server.set(nickname, json.dumps(info)))
+async def build_user_info():
+    exists = await server.get(nickname) #check if user exists in DHT
+    if exists is None:
+        info = {'ip': ip_address, 'port': p2p_port, 'followers': {}, 'vector_clock': {nickname: 0}}
+        asyncio.ensure_future(server.set(nickname, json.dumps(info)))
 
 
 # Get user real ip
@@ -173,7 +182,8 @@ if __name__ == "__main__":
         (messages, following) = local_storage.read_data(db_file+nickname)   # TODO rm nickname (it's necessary for to allow tests in the same host
 
         loop.add_reader(sys.stdin, handle_stdin)                            # Register handler to read STDIN
-        build_user_info()                                                   # Register in DHT user info
+        asyncio.async(build_user_info())                                    # Register in DHT user info
+        asyncio.async(get_timeline())
 
         m = build_menu()
         asyncio.async(async_tasks.task(server, loop, nickname, m, queue))   # Register handler to consume the queue

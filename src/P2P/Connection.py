@@ -9,13 +9,13 @@ class Connection:
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
 
-    # bind an address 
+    # bind an address
     def bind(self):
         server_address = (self.host, self.port)
         self.sock.bind(server_address)
 
 
-    # create a connection 
+    # create a connection
     def connect(self):
         server_address = (self.host, self.port)
         self.sock.connect(server_address)
@@ -25,7 +25,8 @@ class Connection:
     def listen(self, stop_event):
         self.sock.listen(1)
 
-        while not stop_event:
+        #while not stop_event:
+        while True:
             print('waiting for a connection')
             connection, client_address = self.sock.accept()
             manager = threading.Thread(target=self.__process_request, args=(connection, client_address,))
@@ -46,13 +47,13 @@ class Connection:
                     break
         finally:
             connection.close()
-   
-    
+
+
     # send a message to the other peer
     def send(self, msg):
         try:
             self.sock.sendall(msg.encode('utf-8'))
-           
+
             data = self.sock.recv(16)
             print ('received "%s"' % data.decode('utf-8'))
         finally:

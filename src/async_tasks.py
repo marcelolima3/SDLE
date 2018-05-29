@@ -15,10 +15,10 @@ def task(server, loop, nickname, menu, queue):
 
 async def task_follow(user_id, nickname, server, following, ip_address, p2p_port):
     result = await server.get(user_id)
-    
+
     if result is None:
         print('That user doesn\'t exist!')
-    else: 
+    else:
         userInfo = json.loads(result)
         print(userInfo)
         try:
@@ -26,9 +26,9 @@ async def task_follow(user_id, nickname, server, following, ip_address, p2p_port
                 print('You\'re following him!')
         except Exception:
             print('Following ' + user_id)
-            following.append({'id': user_id, 'ip': userInfo['ip']}) # é preciso guardar a porta dos que eu sigo? 
+            following.append({'id': user_id, 'ip': userInfo['ip']}) # é preciso guardar a porta dos que eu sigo?
             userInfo['followers'][nickname] = f'{ip_address} {p2p_port}'
-            print(f"{user_id} ----> {userInfo['followers'][nickname]}")
+            userInfo['vector_clock'][nickname] = 0
             asyncio.ensure_future(server.set(user_id, json.dumps(userInfo)))
 
 
@@ -39,25 +39,26 @@ async def get_followers_p2p(server, nickname):
 
     if result is None:
         print('ERROR - Why don\'t I belong to the DHT?')
-    else: 
+    else:
         userInfo = json.loads(result)
         print(userInfo)
+        userInfo['vector_clock'][nickname] += 1
+        asyncio.ensure_future(server.set(nickname, json.dumps(userInfo)))
         for user, info in userInfo['followers'].items():
-            print(info)
             connection_info.append(info)
     return connection_info
 
 
 async def task_send_msg(msg, server, nickname):
     connection_info = await get_followers_p2p(server, nickname)
-    print('CONNECTION INFO (Ip, Port)')
+    #print('CONNECTION INFO (Ip, Port)')
     for follower in connection_info:
-        print(follower)
+        #print(follower)
         info = follower.split()
-        send_p2p_msg(info[0], int(info[1]), msg)            
+        send_p2p_msg(info[0], int(info[1]), msg)
 
 
 def send_p2p_msg(ip, port, message):
-    connection = Connection(ip, port)  
+    connection = Connection(ip, port)
     connection.connect()
     connection.send(message)
