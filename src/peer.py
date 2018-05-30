@@ -7,6 +7,7 @@ from LocalStorage import local_storage
 from DHT import node
 from P2P.Connection import Connection
 from Menu.Menu import Menu
+import Menu.Menu as menu
 from Menu.Item import Item
 import async_tasks
 import builder
@@ -55,8 +56,13 @@ def follow_user():
 
 # show own timeline
 def show_timeline():
+    menu.clear()
+    print('_______________ Timeline _______________')
     for m in timeline:
         print(m['id'] + ' - ' + m['message'])
+    print('________________________________________')
+    input('Press Enter')
+    menu.clear()
     return False
 
 
@@ -96,10 +102,11 @@ def check_argv():
 async def get_timeline():
     for user in following:
         result = await server.get(user['id'])
-        userInfo = json.loads(result)
-        random_follower = await get_random_updated_follower(userInfo)
-        if random_follower is not None:
-            ask_for_timeline(random_follower, user['id'])
+        if result is not None:
+            userInfo = json.loads(result)
+            random_follower = await get_random_updated_follower(userInfo)
+            if random_follower is not None:
+                ask_for_timeline(random_follower, user['id'])
 
 
 # temos de implementar o XOR
@@ -133,6 +140,7 @@ def isOnline(userIP, userPort):
 # send a message to a node asking for a specific timeline
 def ask_for_timeline(userIp, TLUser):
     print(TLUser)
+    print(userIp)
     print('ASKING FOR TIMELINE')
 
 
@@ -165,8 +173,7 @@ def get_ip_address():
 
 
 # put the peer in "Listen mode" for new connections
-def start_p2p_listenner(port):
-    connection = Connection(get_ip_address(), port)
+def start_p2p_listenner(connection):
     connection.bind()
     connection.listen(timeline)
 
@@ -175,14 +182,17 @@ def start_p2p_listenner(port):
 if __name__ == "__main__":
     check_argv()
     p2p_port = sys.argv[2]
-    thread = Thread(target = start_p2p_listenner, args = (int(p2p_port), ))
+    ip_address = get_ip_address() 
     (server, loop) = start()
     try:
         print('Peer is running...')
         nickname = get_nickname()                                           # Get nickname from user
-        thread.start()
-        ip_address = get_ip_address()                                       # Get ip address from user
+                                              # Get ip address from user
         (timeline, following) = local_storage.read_data(db_file+nickname)   # TODO rm nickname (it's necessary for to allow tests in the same host
+
+        connection = Connection(ip_address, int(p2p_port))
+        thread = Thread(target = start_p2p_listenner, args = (connection, ))
+        thread.start()
 
         loop.add_reader(sys.stdin, handle_stdin)                            # Register handler to read STDIN
         asyncio.async(build_user_info())                                    # Register in DHT user info
@@ -196,6 +206,7 @@ if __name__ == "__main__":
     finally:
         print('Good Bye!')
         local_storage.save_data(timeline, following, db_file+nickname)      # TODO rm nickname
+        connection.stop()
         server.stop()                                                       # Stop the server with DHT Kademlia
         loop.close()                                                        # Stop the async loop
         sys.exit(1)                                                      

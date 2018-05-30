@@ -5,6 +5,7 @@ class Connection:
         self.host = host
         self.port = port
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.running = True
 
 
     # bind an address
@@ -24,11 +25,18 @@ class Connection:
         self.sock.listen(1)
 
         #while not stop_event:
-        while True:
+        while self.running:
             print('waiting for a connection')
             connection, client_address = self.sock.accept()
             manager = threading.Thread(target=process_request, args=(connection, client_address, timeline))
             manager.start()
+
+
+    def stop(self):
+        self.running = False
+        socket.socket(socket.AF_INET, 
+                  socket.SOCK_STREAM).connect((self.host, self.port))
+        self.sock.close()
 
 
     # send a message to the other peer
@@ -59,7 +67,7 @@ def process_request(connection, client_address, timeline):
         connection.close()
 
 
-def process_message( data, timeline):
+def process_message(data, timeline):
     info = json.loads(data)
     if info['type'] == 'simple':
         timeline.append({'id': info['id'], 'message': info['msg']})
