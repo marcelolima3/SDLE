@@ -1,4 +1,4 @@
-import asyncio, json
+import asyncio, json, socket
 from P2P.Connection import Connection
 
 # process all messages into the Queue
@@ -26,7 +26,7 @@ async def task_follow(user_id, nickname, server, following, ip_address, p2p_port
                 print('You\'re following him!')
         except Exception:
             print('Following ' + user_id)
-            following.append({'id': user_id, 'ip': userInfo['ip']}) # é preciso guardar a porta dos que eu sigo?
+            following.append({'id': user_id, 'ip': userInfo['ip'], 'port': userInfo['port']})
             userInfo['followers'][nickname] = f'{ip_address} {p2p_port}'
             userInfo['vector_clock'][nickname] = 0
             asyncio.ensure_future(server.set(user_id, json.dumps(userInfo)))
@@ -59,7 +59,20 @@ async def task_send_msg(msg, server, nickname, vector_clock):
         send_p2p_msg(info[0], int(info[1]), msg)
 
 
-def send_p2p_msg(ip, port, message):
-    connection = Connection(ip, port)
-    connection.connect()
-    connection.send(message)
+def send_p2p_msg(ip, port, message, timeline=None):
+    if isOnline(ip, port):
+        connection = Connection(ip, port)
+        connection.connect()
+        connection.send(message, timeline)
+
+
+# check if a node is online
+def isOnline(userIP, userPort):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    result = sock.connect_ex((userIP, userPort))
+    if result == 0:
+        print("IS ONLINE" + userIP)
+        return True
+    else:
+        print("NOT ONLINE" + userIP)
+        return False
