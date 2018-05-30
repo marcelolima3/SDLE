@@ -106,35 +106,37 @@ async def get_timeline():
         if result is not None and result2 is not None:
             userInfo = json.loads(result)
             ownInfo = json.loads(result2)
-            random_follower = await get_random_updated_follower(user['id'], userInfo, ownInfo)
+            random_follower, n = await get_random_updated_follower(user, userInfo, ownInfo)
             if random_follower is not None:
-                ask_for_timeline(random_follower[0], random_follower[1], user['id'])
-            else:
-                ask_for_timeline(user['ip'], user['port'], user['id'])
+                ask_for_timeline(random_follower[0], random_follower[1], user['id'], n)
+            
 
 
 # temos de implementar o XOR
-async def get_random_updated_follower(id, userInfo, ownInfo):
+async def get_random_updated_follower(user, userInfo, ownInfo):
     print("RANDOM FOLLOWER")
+    id = user['id']
     user_followers = userInfo['followers']
     while(user_followers):
         random_follower = random.choice(list(user_followers.keys()))
         random_follower_con = userInfo['followers'][random_follower]
         info = random_follower_con.split()
-        print(userInfo)
-        print(ownInfo)
-        #if userInfo['vector_clock'][id] >= ownInfo['vector_clock'][id] and random_follower != nickname and async_tasks.isOnline(info[0], int(info[1])):
-        if random_follower != nickname and async_tasks.isOnline(info[0], int(info[1])):
+        print(userInfo['vector_clock'])
+        print(vector_clock)
+        if userInfo['vector_clock'][id] > vector_clock[id] and random_follower != nickname and async_tasks.isOnline(info[0], int(info[1])):
+        #if random_follower != nickname and async_tasks.isOnline(info[0], int(info[1])):
             print("FOUND")
-            return info
+            return info, int(userInfo['vector_clock'][id]) - vector_clock[id] 
         user_followers.pop(random_follower)
     print("FAILED")
-    return None
-
+    if userInfo['vector_clock'][id] > vector_clock[id]:
+        return [user['ip'], user['port']], int(userInfo['vector_clock'][id]) - vector_clock[id] 
+    else:
+        return None, 0
 
 # send a message to a node asking for a specific timeline
-def ask_for_timeline(userIp, userPort, TLUser):
-    msg = builder.timeline_msg(TLUser, vector_clock)
+def ask_for_timeline(userIp, userPort, TLUser, n):
+    msg = builder.timeline_msg(TLUser, vector_clock, n)
     async_tasks.send_p2p_msg(userIp, int(userPort), msg, timeline)
     print('ASKING FOR TIMELINE')
 
@@ -170,38 +172,38 @@ def get_ip_address():
 # put the peer in "Listen mode" for new connections
 def start_p2p_listenner(connection):
     connection.bind()
-    connection.listen(timeline, server, nickname)
+    connection.listen(timeline, server, nickname, vector_clock)
 
 
 """ MAIN """
 if __name__ == "__main__":
     check_argv()
     p2p_port = sys.argv[2]
-    ip_address = get_ip_address() 
+    ip_address = get_ip_address()                                                           # Get ip address from user
     (server, loop) = start()
     try:
         print('Peer is running...')
-        nickname = get_nickname()                                           # Get nickname from user
-                                              # Get ip address from user
-        (timeline, following) = local_storage.read_data(db_file+nickname)   # TODO rm nickname (it's necessary for to allow tests in the same host
+        nickname = get_nickname()                                                           # Get nickname from user
+                                             
+        (timeline, following, vector_clock) = local_storage.read_data(db_file+nickname)     # TODO rm nickname (it's necessary for to allow tests in the same host
 
         connection = Connection(ip_address, int(p2p_port))
         thread = Thread(target = start_p2p_listenner, args = (connection, ))
         thread.start()
 
-        loop.add_reader(sys.stdin, handle_stdin)                            # Register handler to read STDIN
-        asyncio.async(build_user_info())                                    # Register in DHT user info
+        loop.add_reader(sys.stdin, handle_stdin)                                            # Register handler to read STDIN
+        asyncio.async(build_user_info())                                                    # Register in DHT user info
         asyncio.async(get_timeline())
 
         m = build_menu()
-        asyncio.async(async_tasks.task(server, loop, nickname, m, queue))   # Register handler to consume the queue
-        loop.run_forever()                                                  # Keeps the user online
+        asyncio.async(async_tasks.task(server, loop, nickname, m, queue))                   # Register handler to consume the queue
+        loop.run_forever()                                                                  # Keeps the user online
     except Exception:
         pass
     finally:
         print('Good Bye!')
-        local_storage.save_data(timeline, following, db_file+nickname)      # TODO rm nickname
-        connection.stop()
-        server.stop()                                                       # Stop the server with DHT Kademlia
-        loop.close()                                                        # Stop the async loop
+        local_storage.save_data(timeline, following, vector_clock, db_file+nickname)        # TODO rm nickname
+        connection.stop()                                                                   # stop thread in "listen mode"
+        server.stop()                                                                       # Stop the server with DHT Kademlia
+        loop.close()                                                                        # Stop the async loop
         sys.exit(1)                                                      

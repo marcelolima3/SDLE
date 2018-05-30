@@ -10,6 +10,6 @@ def simple_msg(msg, nickname):
     return json.dumps(simple_msg)
 
 
-def timeline_msg(id, vclock):
-    msg = {'type': 'timeline', 'id': id, 'v_clock': vclock}
+def timeline_msg(id, vclock, n):
+    msg = {'type': 'timeline', 'id': id, 'v_clock': vclock, 'n': n}
     return json.dumps(msg) 

@@ -71,8 +71,8 @@ def isOnline(userIP, userPort):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     result = sock.connect_ex((userIP, userPort))
     if result == 0:
-        print("IS ONLINE" + userIP)
+        print("IS ONLINE " + userIP)
         return True
     else:
-        print("NOT ONLINE" + userIP)
+        print("NOT ONLINE " + userIP)
         return False
