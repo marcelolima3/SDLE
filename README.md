@@ -1,1 +1,1 @@
-# SDLE
+# Sistemas Distribuídos em Larga Escala - Decentralized Timeline
